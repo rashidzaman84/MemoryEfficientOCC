@@ -11,8 +11,7 @@ Implementation of:
 
 - [Efficient Memory Utilization in Conformance Checking of Process Event Streams.](https://dl.acm.org/doi/abs/10.1145/3477314.3507217). R Zaman, M Hassani, BF van Dongen - SAC2022. ACM
 
-- [A Framework for Efficient Memory Utilization in Online Conformance Checking](https://arxiv.org/abs/2112.13640). R Zaman, M Hassani, BF van Dongen - In arXiv. https://arxiv.org/abs/2112.13640
-
+- [A Framework for Efficient Memory Utilization in Online Conformance Checking](https://arxiv.org/abs/2112.13640). R Zaman, M Hassani, BF van Dongen - In arXiv.
 
 
 This prototype implementation is related to the Memory-efficient prefix-alignments based Online Conformance Checking (OCC) approaches proposed in the abovementioned two papers. The proposed approach forgets states in excess of the defined limit.
