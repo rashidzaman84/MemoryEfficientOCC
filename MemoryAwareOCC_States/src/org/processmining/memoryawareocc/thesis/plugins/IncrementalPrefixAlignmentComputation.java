@@ -1,4 +1,4 @@
-package org.processmining.memoryawareocc.plugins;
+package org.processmining.memoryawareocc.thesis.plugins;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -16,7 +16,6 @@ import java.util.Map.Entry;
 import org.deckfour.xes.model.XLog;
 import org.javatuples.Triplet;
 import org.processmining.memoryawareocc.algorithms.impl.MeanMedianMode;
-import org.processmining.memoryawareocc.algorithms.impl.NullConfiguration;
 import org.processmining.memoryawareocc.algorithms.impl.StatesCalculator;
 import org.processmining.memoryawareocc.algorithms.impl.TimeStampsBasedLogToStreamConverter;
 //import org.processmining.memoryawareocc.algorithms.IncrementalReplayer;
@@ -28,7 +27,6 @@ import org.processmining.models.graphbased.directed.petrinet.elements.Place;
 import org.processmining.models.graphbased.directed.petrinet.elements.Transition;
 import org.processmining.models.semantics.petrinet.Marking;
 import org.processmining.onlineconformance.algorithms.IncrementalReplayer;
-import org.processmining.onlineconformance.models.IncrementalReplayResult;
 import org.processmining.onlineconformance.models.ModelSemanticsPetrinet;
 import org.processmining.onlineconformance.models.Move;
 import org.processmining.onlineconformance.models.PartialAlignment;
@@ -48,7 +46,7 @@ public class IncrementalPrefixAlignmentComputation {
 //	@UITopiaVariant(author = "R. Zaman", email = "r.zaman@tue.nl", affiliation = "Eindhoven University of Technology")
 //	@PluginVariant(variantLabel = "01 Compute Prefix Alignments - With Bounded States", requiredParameterLabels = { 0, 1})
 
-	public static NullConfiguration apply(
+	public static ResultsCollection2 apply(
 			final Petrinet net, XLog log, int stateLimit) throws IOException {
 		
 		//-------parameter to set
@@ -77,12 +75,12 @@ public class IncrementalPrefixAlignmentComputation {
 		parameters.setExperiment(false);		
 		parameters.setLookBackWindow(stateLimit);
 
-		applyGeneric(net, initialMarking, finalMarking, log, parameters, stateLimit);
-		return null;
+		return applyGeneric(net, initialMarking, finalMarking, log, parameters, stateLimit);
+		
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <A extends PartialAlignment<String, Transition, Marking>> void applyGeneric(
+	public static <A extends PartialAlignment<String, Transition, Marking>> ResultsCollection2 applyGeneric(
 			final Petrinet net, final Marking initialMarking, final Marking finalMarking,
 			/*final*/ XLog log, final IncrementalRevBasedReplayerParametersImpl<Petrinet, String, Transition> parameters, int stateLimit) throws IOException {
 		ModelSemanticsPetrinet<Marking> modelSemantics = ModelSemanticsPetrinet.Factory.construct(net);
@@ -97,29 +95,24 @@ public class IncrementalPrefixAlignmentComputation {
 		IncrementalReplayer<Petrinet, String, Marking, Transition, String, PartialAlignment<String, Transition, Marking>, IncrementalRevBasedReplayerParametersImpl<Petrinet, String, Transition>> replayer = IncrementalReplayer.Factory
 				.construct(initialMarking, finalMarking, store, modelSemantics, parameters, labelsInPN,
 						IncrementalReplayer.Strategy.REVERT_BASED);
-		processXLog(log, net, initialMarking, replayer, stateLimit);
+		return processXLog(log, net, initialMarking, replayer, stateLimit);
 	}
 
 
 	@SuppressWarnings("unchecked")
-	private static <A extends PartialAlignment<String, Transition, Marking>> IncrementalReplayResult<String, String, Transition, Marking, A> processXLog(
+	private static <A extends PartialAlignment<String, Transition, Marking>> ResultsCollection2 processXLog(
 			XLog log, Petrinet net, Marking iMarking,
 			IncrementalReplayer<Petrinet, String, Marking, Transition, String, A, ? extends IncrementalReplayerParametersImpl<Petrinet, String, Transition>> replayer,int stateLimit){
 
 		ArrayList<Triplet<String,String,Date>>	eventLogSortedByDate = new ArrayList<>();		
-		HashMap<String, List<Double>> compoundCost = new HashMap<>();
-		//ArrayList<Triplet<Integer, Integer, Double>> CostRecords = new ArrayList<>();
-		ArrayList<Triplet<Integer, String, Double>> universalCostRecords = new ArrayList<>();
-		HashMap<Integer, ArrayList<Integer>> universalStateRecords = new HashMap<>();
 		
 		String caseId;
 		String event;
-		int observedEvents = 0;
-		final double noOfWindows = 10d;
+		
 		eventLogSortedByDate = TimeStampsBasedLogToStreamConverter.sortEventLogByDate(log);
-		int eventsWindowSize = (int) Math.ceil(eventLogSortedByDate.size()/noOfWindows);
-		int remainder = eventLogSortedByDate.size()%eventsWindowSize;
-		int window = 0;
+		
+		 Map<String, Double> eventualCosts = new HashMap<>();
+	     ArrayList<Integer> stateRecords = new ArrayList<>();
 
 		for (Triplet<String,String, Date> entry : eventLogSortedByDate) {
 
@@ -129,7 +122,6 @@ public class IncrementalPrefixAlignmentComputation {
 			PartialAlignment<String, Transition, Marking> partialAlignment = replayer.processEvent(caseId, event);  //Prefix Alignment of the current observed event
 
 			
-			//trackCosts(partialAlignment, caseId, compoundCost);
 			if (!((partialAlignment.size()  < stateLimit) || (StatesCalculator.getNumberOfStates(partialAlignment) <= stateLimit))) {
 				partialAlignment = trimAlignment(partialAlignment, stateLimit);
 				replayer.getDataStore().put(caseId, (A)partialAlignment);
@@ -138,74 +130,21 @@ public class IncrementalPrefixAlignmentComputation {
 			if(StatesCalculator.getNumberOfStates(partialAlignment) > stateLimit) { //to check the correctness of trimming
 				System.out.println("I have more states than allowed...");
 			}
+			
+			eventualCosts.put(caseId, partialAlignment.getCost());
+			stateRecords.add(StatesCalculator.getNumberOfStatesInMemory(replayer.getDataStore())); 
 
-			java.util.Iterator<Triplet<Integer, String, Double>> iterator = universalCostRecords.iterator();			//recording fitness costs
-			while(iterator.hasNext()) {
-				Triplet<Integer, String, Double> temp = iterator.next();
-				if(temp.getValue0()==(window+1) && temp.getValue1().equals(caseId)) {
-					iterator.remove();
-					break;
-				}
-			}			
-			universalCostRecords.add(new Triplet<Integer, String, Double>(window+1, caseId, partialAlignment.getCost()));
-
-			//recording states			
-			if(universalStateRecords.containsKey(window+1)) {
-				universalStateRecords.get(window+1).add(StatesCalculator.getNumberOfStatesInMemory(replayer.getDataStore()));
-			}else {
-				ArrayList<Integer> tempStates = new ArrayList<>();
-				tempStates.add(StatesCalculator.getNumberOfStatesInMemory(replayer.getDataStore()));
-				universalStateRecords.put(window+1, tempStates);
-			}
-			//System.out.println(StatesCalculator.getNumberOfStatesInMemory(replayer.getDataStore()));
-
-			observedEvents++;
-
-			if(observedEvents==eventsWindowSize || (window+1 == noOfWindows && observedEvents == remainder)){ 
-				
-				observedEvents = 0;	
-//
-//				int noOfObservedCases=0;
-//				int noOfNonConformantCases=0;
-//				double nonConformanceCosts=0.0;
-//
-//				for(Entry<String, List<Double>> record: compoundCost.entrySet()){
-//					boolean nonConformant=false;
-//					noOfObservedCases++;
-//					for(Double cost : record.getValue()) {
-//						nonConformanceCosts += cost;
-//						if(cost>0.0) {
-//							nonConformant = true;
-//						}
-//					}
-//					if(nonConformant) {
-//						noOfNonConformantCases++;
-//					}
-//				}
-//				CostRecords.add(new Triplet<Integer, Integer, Double>(noOfObservedCases, noOfNonConformantCases, nonConformanceCosts));
-//				compoundCost.clear();
-				window++; 
-
-			}
 		}
 
 
-		writeRecordsToFile(universalCostRecords, stateLimit, Integer.MAX_VALUE);
+		ResultsCollection2 resultsCollection2 = new ResultsCollection2();
 
-//		System.out.println("\n ,Non-conformant \n Window,Cases,Costs");
-//		int index = 1;
-//		for(Triplet<Integer, Integer, Double> entry : CostRecords) {
-//			System.out.println(index + "," + entry.getValue1() + "," + entry.getValue2());
-//			index++;
-//		}
+		resultsCollection2.costRecords.putAll(eventualCosts);
+		resultsCollection2.maxStates = Collections.max(stateRecords);
+		resultsCollection2.caseLimitSize = Integer.MAX_VALUE;
+		resultsCollection2.featureSize = stateLimit;
 
-		calculateStatesInWindows(universalStateRecords, "Max");
-
-		//System.out.println("\n");
-
-		//System.out.println("Window,Type1,Type2,Distinct Cases,Fresh Cases,Type1 Events,Type2 Events ");
-
-		return null;
+		return resultsCollection2;
 	}
 
 	private static void setupLabelMap(final Petrinet net, Map<Transition, String> modelElementsToLabelMap, Map<String, Collection<Transition>> labelsToModelElementsMap) {
