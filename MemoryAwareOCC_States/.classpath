@@ -6,6 +6,6 @@
 	<classpathentry kind="con" path="org.apache.ivyde.eclipse.cpcontainer.IVYDE_CONTAINER/?project=NewPackageIvy&amp;ivyXmlPath=ivy.xml&amp;confs=*&amp;ivySettingsPath=ivysettings.xml&amp;loadSettingsOnDemand=false&amp;ivyUserDir=&amp;propertyFiles="/>
 	<classpathentry kind="lib" path="lib/hipster4j-1.0.1-svz-1.jar" sourcepath="/hipster-core"/>
 	<classpathentry kind="lib" path="C:/Users/20185004/.ivy2/cache/prom/PNAnalysis/jars/PNAnalysis-latest.jar"/>
-	<classpathentry kind="lib" path="C:/Users/20185004/eclipse-workspace-Streams/MemoryAwareOCC/lib/weka-stable-3.8.0.jar"/>
+	<classpathentry exported="true" kind="lib" path="D:/20185004/git/IS/MemoryAwareOCC/lib/weka-stable-3.8.0.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
